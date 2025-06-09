@@ -35,10 +35,17 @@ This investigation was initiated based on concerns from management regarding Joh
 - **MITRE Tactics:** Execution, Defense Evasion
 - **Techniques Expected / Validated:** T1059.001 (PowerShell), T1204.002 (User Execution), T1105 (Ingress Tool Transfer)
 
-**What We Investigated:**
+* **What We Investigated:**
 We investigated the initial instance of `.zip` file creation on `danielletargetm` to identify the processes involved.
 
-**KQL Query Used:**
+* **Query Input 🔽**
+    ```kql
+    DeviceFileEvents
+    | where DeviceName contains "danielletargetm"
+    | where FileName endswith ".zip"
+    | order by Timestamp desc
+    ```
+    
     ```kql
     let VMName = "danielletargetm";
     let specificTime = datetime(2025-05-31T16:50:02.0895454Z);
@@ -46,36 +53,54 @@ We investigated the initial instance of `.zip` file creation on `danielletargetm
     | where Timestamp between ((specificTime - 2m) .. (specificTime + 2m))
     | where DeviceName == VMName
     | order by Timestamp desc
+    ```
 
-**What We Found:**
-A PowerShell script (`exfiltratedata.ps1`) was executed, launched by `cmd.exe` with High integrity (elevated privileges). This script was responsible for silently installing `7-Zip` (`7z2408-x64.exe`) after downloading it from an external Azure Blob Storage URL. 
+* **KQL Output** ⏬
 
-**Interpretation:**
+  ![First KQL ](https://github.com/user-attachments/assets/eaecfc4e-ef0f-439f-b497-fb8a0d0cde87)
+
+  ---
+  ![3 processes](https://github.com/user-attachments/assets/9e629aaf-5fb0-4be2-9167-b7cd39c620dd)
+
+  ---
+  ![exfiltrateddata ps1](https://github.com/user-attachments/assets/335a9d01-b2e7-4b9e-a610-289e378dbb36)
+  
+  ---
+  ![inspect record](https://github.com/user-attachments/assets/2090cdd7-0118-40d3-b2f5-4524c0d2868e)
+
+  
+
+
+* **What We Found:**
+A PowerShell script (`exfiltratedata.ps1`) was executed, launched by `cmd.exe` with High integrity (elevated privileges). This script was responsible for silently installing `7-Zip` (`7z2408-x64.exe`). 
+
+* **Interpretation:**
 This indicates automated and elevated execution of a script that downloads and installs unauthorized software. The use of PowerShell with `ExecutionPolicy Bypass` is a significant red flag for malicious activity. 
 
-**Mapped MITRE Techniques:**
-* **Execution** 
-    * T1059.001: PowerShell  - PowerShell was used to execute the script and perform system actions. 
-    * T1204.002: User Execution: Malicious File  - The script was initiated via `cmd.exe`, which could stem from a user action (e.g., clicking a malicious file or scheduled task). 
-* **Defense Evasion** 
-    * T1105: Ingress Tool Transfer  - The `7-Zip` installer was downloaded from an external URL. 
+* **Mapped MITRE Techniques:**
+
+| Tactic          | Technique ID | Description                                                                                              |
+| :-------------- | :----------- | :------------------------------------------------------------------------------------------------------- |
+| Execution       | T1059.001    | PowerShell - PowerShell was used to execute the script and perform system actions.                       |
+| Execution       | T1204.002    | User Execution: Malicious File - The script was initiated via `cmd.exe`, which could stem from a user action (e.g., clicking a malicious file or scheduled task).  |
+| Defense Evasion | T1105        | Ingress Tool Transfer - The `7-Zip` installer was downloaded from an external URL.                     |
 
 ### Phase 2 - Collection & Compression
 
-**PEAK Step:** Analyze 
-**MITRE Tactics:** Collection 
-**Techniques Expected / Validated:** T1005 (Data from Local System), T1560.001 (Archive Collected Data: Archive via Utility) 
+* **PEAK Step:** Analyze 
+* **MITRE Tactics:** Collection 
+* **Techniques Expected / Validated:** T1005 (Data from Local System), T1560.001 (Archive Collected Data: Archive via Utility) 
 
-**What We Investigated:**
+* **What We Investigated:**
 We observed recurring patterns of `.csv` file compression and renaming. 
 
-**KQL Query Used:**
-```kql
-DeviceFileEvents
-| where DeviceName contains "danielletargetm"
-| where FileName endswith ".zip"
-| order by Timestamp desc
-``` 
+* **KQL Query Used:**
+    ```kql
+    DeviceFileEvents
+    | where DeviceName contains "danielletargetm"
+    | where FileName endswith ".zip"
+    | order by Timestamp desc
+    ``` 
 
 **What We Found:**
 The `exfiltratedata.ps1` script generated fake employee data into a temporary CSV file (`employee-data-YYYYMMDDHHmmss.csv`). Subsequently, `7z.exe` was used to compress this CSV file into a `.zip` archive (`employee-data-YYYYMMDDHHmmss.zip`) within the `C:\ProgramData` directory. This behavior was observed on multiple dates (May 31 and June 2, 2025). 
