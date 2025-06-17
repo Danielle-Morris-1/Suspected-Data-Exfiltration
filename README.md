@@ -10,6 +10,10 @@
 - **Targeted Account(s):** John Doe 
 - **Summary:** An investigation into `danielletargetm` revealed strong indicators of automated data exfiltration. A malicious PowerShell script (`exfiltratedata.ps1`) was executed, which silently installed 7-Zip, generated and compressed fake employee data, and then uploaded it to an external Azure Blob Storage account using embedded credentials. The script also attempted to clean up its local footprint. This activity shows a consistent and highly suspicious pattern, indicating a sustained threat.
 
+
+  ![image](https://github.com/user-attachments/assets/a96b5df5-3baf-4b31-bff1-efafda992251)
+
+
 ## 2. Scenario Overview
 
 This investigation was initiated based on concerns from management regarding John Doe, an employee on a Performance Improvement Plan (PIP), and the potential for data theft from his assigned machine, `danielletargetm`. The scenario simulated a sophisticated data exfiltration attempt using scripting and legitimate tools for malicious purposes. The threat behavior involves the use of Living Off The Land Binaries (LOLBins) like PowerShell and `7z.exe` to achieve its objectives.
