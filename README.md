@@ -86,6 +86,9 @@ This investigation was initiated based on concerns from management regarding Joh
 
 * **KQL Output** ⏬
 
+    ![image](https://github.com/user-attachments/assets/79a0b13e-b463-4855-95cd-d7a7e3878396)
+
+    ---
     ![3 processes](https://github.com/user-attachments/assets/9e629aaf-5fb0-4be2-9167-b7cd39c620dd)
 
     ---
@@ -119,11 +122,16 @@ This investigation was initiated based on concerns from management regarding Joh
 * **What We Investigated:**
     Following the identification and initial analysis of the `exfiltratedata.ps1` script in Phase 2, we conducted a deeper examination of its code to understand its external communication capabilities and data exfiltration mechanisms.
 
-* **KQL Query Used:**
-    (No specific KQL query for the exfiltration itself was needed, as the action was confirmed through script analysis.)
+* **Relevant Code Block:**
+
+   ![VM Script](https://github.com/user-attachments/assets/b8c86db8-1d94-490e-87e9-848edd8a2c32)    
+
+    ---
+  ![image](https://github.com/user-attachments/assets/a5944d58-9655-4891-bdd6-aedff923b96e)
 
 * **What We Found:**
     The `exfiltratedata.ps1` script contained hardcoded Azure Blob Storage variables, including a target URL (`https://sacyberrangedanger.blob.core.windows.windows.net/stolencompanydata/employee-data.zip`) and a critical hardcoded storage key. The script was designed to use `Invoke-WebRequest` to upload the compressed zip file directly to this external Azure Blob Storage URL.
+
 
 * **Interpretation:**
     This constitutes the core exfiltration event, where the collected and compressed data is transferred to an unauthorized external cloud storage. The presence of a hardcoded storage key represents a severe security vulnerability, granting direct access to the storage account.
@@ -145,8 +153,13 @@ This investigation was initiated based on concerns from management regarding Joh
 * **What We Investigated:**
     Continuing our analysis of the `exfiltratedata.ps1` script (identified in Phase 2), we reviewed its code for any post-exfiltration cleanup routines or mechanisms designed to establish persistence or evade detection.
 
-* **KQL Query Used:**
-    (No specific KQL query for cleanup was needed, but the script analysis confirmed the actions.)
+* **Relevant Code Block:**
+  
+    ![image](https://github.com/user-attachments/assets/1e62613e-77a1-4ff1-adb2-2223a733b044)
+
+    ---
+
+    ![image](https://github.com/user-attachments/assets/3163c479-f5ef-4ead-9891-b3bce0ed56db)
 
 * **What We Found:**
     After successfully uploading the data, the script performed cleanup actions by moving both the generated temporary CSV file and the compressed zip file into a non-standard backup directory (`C:\ProgramData\backup\`). Additionally, it was found to log activity to an obscure log file (`C:\ProgramData\entropygorilla.log`).
