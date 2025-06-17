@@ -38,7 +38,7 @@ This investigation was initiated based on concerns from management regarding Joh
 * **What We Investigated:**
     Our investigation began by identifying instances of `.zip` file creation on `danielletargetm` to understand potential data compression activities.
 
-* **KQL Query Used:**
+* **Query Input 🔽**
     ```kql
     DeviceFileEvents
     | where DeviceName contains "danielletargetm"
@@ -83,6 +83,15 @@ This investigation was initiated based on concerns from management regarding Joh
     | where DeviceName == VMName
     | order by Timestamp desc
     ```
+    ```kql
+    DeviceProcessEvents
+    | where Timestamp > ago(30d)
+    | where DeviceName == "danielletargetm"
+    | where FileName in ("7z.exe", "7z2408-x64.exe", "powershell.exe")
+    | project Timestamp, DeviceName, InitiatingProcessCommandLine, FileName, FolderPath, ProcessId, ReportId
+    | order by Timestamp desc
+    ```
+
 
 * **KQL Output** ⏬
 
@@ -122,12 +131,14 @@ This investigation was initiated based on concerns from management regarding Joh
 * **What We Investigated:**
     Following the identification and initial analysis of the `exfiltratedata.ps1` script in Phase 2, we conducted a deeper examination of its code to understand its external communication capabilities and data exfiltration mechanisms.
 
-* **Relevant Code Block:**
+* **Relevant Code Block** ⏬
 
-   ![VM Script](https://github.com/user-attachments/assets/b8c86db8-1d94-490e-87e9-848edd8a2c32)    
-
+   ![image](https://github.com/user-attachments/assets/624aa391-b8a6-49c7-abe0-22ca65867f45)
+    
     ---
-  ![image](https://github.com/user-attachments/assets/a5944d58-9655-4891-bdd6-aedff923b96e)
+
+  ![image](https://github.com/user-attachments/assets/61839186-f7b7-4a2f-8121-b46daa799346)
+
 
 * **What We Found:**
     The `exfiltratedata.ps1` script contained hardcoded Azure Blob Storage variables, including a target URL (`https://sacyberrangedanger.blob.core.windows.windows.net/stolencompanydata/employee-data.zip`) and a critical hardcoded storage key. The script was designed to use `Invoke-WebRequest` to upload the compressed zip file directly to this external Azure Blob Storage URL.
@@ -153,7 +164,7 @@ This investigation was initiated based on concerns from management regarding Joh
 * **What We Investigated:**
     Continuing our analysis of the `exfiltratedata.ps1` script (identified in Phase 2), we reviewed its code for any post-exfiltration cleanup routines or mechanisms designed to establish persistence or evade detection.
 
-* **Relevant Code Block:**
+* **Relevant Code Block** ⏬
   
     ![image](https://github.com/user-attachments/assets/1e62613e-77a1-4ff1-adb2-2223a733b044)
 
