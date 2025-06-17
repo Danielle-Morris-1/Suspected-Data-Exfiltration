@@ -29,23 +29,52 @@ This investigation was initiated based on concerns from management regarding Joh
 
 ## 5. Phase-by-Phase Breakdown
 
-### Phase 1 - Execution & Ingress Tool Transfer
+### Phase 1 - Collection & Initial Observation
 
-- **PEAK Step:** Prepare, Analyze
-- **MITRE Tactics:** Execution, Defense Evasion
-- **Techniques Expected / Validated:** T1059.001 (PowerShell), T1204.002 (User Execution), T1105 (Ingress Tool Transfer)
+- **PEAK Step:** Analyze
+- **MITRE Tactics:** Collection
+- **Techniques Expected / Validated:** T1005 (Data from Local System), T1560.001 (Archive Collected Data: Archive via Utility)
 
 * **What We Investigated:**
-We investigated the initial instance of `.zip` file creation on `danielletargetm` to identify the processes involved.
+    Our investigation began by identifying instances of `.zip` file creation on `danielletargetm` to understand potential data compression activities.
 
-* **Query Input 🔽**
+* **KQL Query Used:**
     ```kql
     DeviceFileEvents
     | where DeviceName contains "danielletargetm"
     | where FileName endswith ".zip"
     | order by Timestamp desc
     ```
-    
+
+* **KQL Output** ⏬
+
+    ![First KQL ](https://github.com/user-attachments/assets/eaecfc4e-ef0f-439f-b497-fb8a0d0cde87)
+
+* **What We Found:**
+    We observed the creation of a `.zip` file (`employee-data-YYYYMMDDHHmmss.zip`) within the `C:\ProgramData` directory on `danielletargetm` at a specific timestamp (e.g., 2025-05-31T16:50:02.0895454Z). This activity was noted on multiple dates (May 31 and June 2, 2025).
+
+* **Interpretation:**
+    The presence of compressed `.zip` archives strongly suggested that data was being prepared or aggregated, likely for exfiltration. This initial finding prompted a deeper investigation into the processes responsible for these file creations.
+
+* **Mapped MITRE Techniques:**
+
+| Tactic      | Technique ID | Description                                                    |
+| :---------- | :----------- | :------------------------------------------------------------- |
+| Collection  | T1005        | Data from Local System - Data (inferred from `.zip` naming convention) was potentially being collected from the local system. |
+| Collection  | T1560.001    | Archive Collected Data: Archive via Utility - The creation of a `.zip` file indicates data was being compressed, likely by a utility. |
+
+---
+
+### Phase 2 - Execution & Ingress Tool Transfer (Process Investigation)
+
+- **PEAK Step:** Prepare, Analyze
+- **MITRE Tactics:** Execution, Defense Evasion
+- **Techniques Expected / Validated:** T1059.001 (PowerShell), T1204.002 (User Execution), T1105 (Ingress Tool Transfer)
+
+* **What We Investigated:**
+    Following the discovery of the `.zip` file creation in Phase 1, we investigated the processes active around the identified timestamp (`2025-05-31T16:50:02.0895454Z`) on `danielletargetm` to determine what initiated the compression.
+
+* **Query Input 🔽**
     ```kql
     let VMName = "danielletargetm";
     let specificTime = datetime(2025-05-31T16:50:02.0895454Z);
@@ -57,117 +86,100 @@ We investigated the initial instance of `.zip` file creation on `danielletargetm
 
 * **KQL Output** ⏬
 
-  ![First KQL ](https://github.com/user-attachments/assets/eaecfc4e-ef0f-439f-b497-fb8a0d0cde87)
+    ![3 processes](https://github.com/user-attachments/assets/9e629aaf-5fb0-4be2-9167-b7cd39c620dd)
 
-  ---
-  ![3 processes](https://github.com/user-attachments/assets/9e629aaf-5fb0-4be2-9167-b7cd39c620dd)
+    ---
+    ![exfiltrateddata ps1](https://github.com/user-attachments/assets/335a9d01-b2e7-4b9e-a610-289e378dbb36)
 
-  ---
-  ![exfiltrateddata ps1](https://github.com/user-attachments/assets/335a9d01-b2e7-4b9e-a610-289e378dbb36)
-  
-  ---
-  ![inspect record](https://github.com/user-attachments/assets/2090cdd7-0118-40d3-b2f5-4524c0d2868e)
-
-  
-
+    ---
+    ![inspect record](https://github.com/user-attachments/assets/2090cdd7-0118-40d3-b2f5-4524c0d2868e)
 
 * **What We Found:**
-A PowerShell script (`exfiltratedata.ps1`) was executed, launched by `cmd.exe` with High integrity (elevated privileges). This script was responsible for silently installing `7-Zip` (`7z2408-x64.exe`). 
+    Our process investigation revealed that a PowerShell script (`exfiltratedata.ps1`) was executed around the time of the `.zip` file creation. This script was launched by `cmd.exe` and operated with High integrity (elevated privileges). Further analysis indicated that this script was responsible for silently installing `7-Zip` (`7z2408-x64.exe`), which was subsequently used for the observed data compression.
 
 * **Interpretation:**
-This indicates automated and elevated execution of a script that downloads and installs unauthorized software. The use of PowerShell with `ExecutionPolicy Bypass` is a significant red flag for malicious activity. 
+    This chain of events indicates automated and elevated execution of a script that downloads and installs unauthorized software, directly leading to data preparation. The use of PowerShell with `ExecutionPolicy Bypass` is a significant red flag for malicious activity, as it bypasses security controls.
 
 * **Mapped MITRE Techniques:**
 
-| Tactic          | Technique ID | Description                                                                                              |
-| :-------------- | :----------- | :------------------------------------------------------------------------------------------------------- |
-| Execution       | T1059.001    | PowerShell - PowerShell was used to execute the script and perform system actions.                       |
-| Execution       | T1204.002    | User Execution: Malicious File - The script was initiated via `cmd.exe`, which could stem from a user action (e.g., clicking a malicious file or scheduled task).  |
-| Defense Evasion | T1105        | Ingress Tool Transfer - The `7-Zip` installer was downloaded from an external URL.                     |
+| Tactic          | Technique ID | Description                                                                                                                                              |
+| :-------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Execution       | T1059.001    | **PowerShell** - PowerShell was used to execute the script and perform system actions, including installing 7-Zip.                                       |
+| Execution       | T1204.002    | **User Execution: Malicious File** - The script was initiated via `cmd.exe`, which could stem from a user action (e.g., clicking a malicious file or scheduled task). |
+| Defense Evasion | T1105        | **Ingress Tool Transfer** - The `7-Zip` installer was downloaded from an external URL, bringing a new tool into the environment for malicious purposes.   |
 
-### Phase 2 - Collection & Compression
-
-* **PEAK Step:** Analyze 
-* **MITRE Tactics:** Collection 
-* **Techniques Expected / Validated:** T1005 (Data from Local System), T1560.001 (Archive Collected Data: Archive via Utility) 
-
-* **What We Investigated:**
-We observed recurring patterns of `.csv` file compression and renaming. 
-
-* **KQL Query Used:**
-    ```kql
-    DeviceFileEvents
-    | where DeviceName contains "danielletargetm"
-    | where FileName endswith ".zip"
-    | order by Timestamp desc
-    ``` 
-
-**What We Found:**
-The `exfiltratedata.ps1` script generated fake employee data into a temporary CSV file (`employee-data-YYYYMMDDHHmmss.csv`). Subsequently, `7z.exe` was used to compress this CSV file into a `.zip` archive (`employee-data-YYYYMMDDHHmmss.zip`) within the `C:\ProgramData` directory. This behavior was observed on multiple dates (May 31 and June 2, 2025). 
-
-**Interpretation:**
-This is a clear preparation step for data exfiltration, where sensitive information is gathered and compressed to facilitate easier and more efficient transfer. The use of `7z.exe`, while legitimate, is often abused in such scenarios. 
-
-**Mapped MITRE Techniques:**
-* **Collection** 
-    * T1005: Data from Local System  - The script generated and accessed "employee data" locally. 
-    * T1560.001: Archive Collected Data: Archive via Utility  - `7z.exe` was used to compress the collected data into a `.zip` file. 
+---
 
 ### Phase 3 - Exfiltration
 
-**PEAK Step:** Analyze, Act 
-**MITRE Tactics:** Exfiltration 
-**Techniques Expected / Validated:** T1567.002 (Exfiltration Over Web Service: Exfiltration to Cloud Storage) 
+- **PEAK Step:** Analyze, Act
+- **MITRE Tactics:** Exfiltration
+- **Techniques Expected / Validated:** T1567.002 (Exfiltration Over Web Service: Exfiltration to Cloud Storage)
 
-**What We Investigated:**
-We analyzed the `exfiltratedata.ps1` script's functionality related to external communications. 
+* **What We Investigated:**
+    Following the identification and initial analysis of the `exfiltratedata.ps1` script in Phase 2, we conducted a deeper examination of its code to understand its external communication capabilities and data exfiltration mechanisms.
 
-**KQL Query Used:**
-(No specific KQL query for the exfiltration itself was provided in the findings, but the script analysis confirmed the action.)
+* **KQL Query Used:**
+    (No specific KQL query for the exfiltration itself was needed, as the action was confirmed through script analysis.)
 
-**What We Found:**
-The `exfiltratedata.ps1` script contained hardcoded Azure Blob Storage variables, including a target URL (`https://sacyberrangedanger.blob.core.windows.net/stolencompanydata/employee-data.zip`) and a critical hardcoded storage key. The script used `Invoke-WebRequest` to upload the compressed zip file directly to this external Azure Blob Storage URL. 
+* **What We Found:**
+    The `exfiltratedata.ps1` script contained hardcoded Azure Blob Storage variables, including a target URL (`https://sacyberrangedanger.blob.core.windows.windows.net/stolencompanydata/employee-data.zip`) and a critical hardcoded storage key. The script was designed to use `Invoke-WebRequest` to upload the compressed zip file directly to this external Azure Blob Storage URL.
 
-**Interpretation:**
-This is the core exfiltration event, where the compressed data is transferred to an unauthorized external cloud storage. The presence of a hardcoded storage key is a severe security vulnerability, granting direct access to the storage account. 
+* **Interpretation:**
+    This constitutes the core exfiltration event, where the collected and compressed data is transferred to an unauthorized external cloud storage. The presence of a hardcoded storage key represents a severe security vulnerability, granting direct access to the storage account.
 
-**Mapped MITRE Techniques:**
-* **Exfiltration** 
-    * T1567.002: Exfiltration Over Web Service: Exfiltration to Cloud Storage  - The script specifically uploaded data to an Azure Blob Storage account. 
+* **Mapped MITRE Techniques:**
+
+| Tactic       | Technique ID | Description                                                    |
+| :----------- | :----------- | :------------------------------------------------------------- |
+| Exfiltration | T1567.002    | Exfiltration Over Web Service: Exfiltration to Cloud Storage - The script specifically uploaded data to an Azure Blob Storage account, a form of cloud storage. |
+
+---
 
 ### Phase 4 - Persistence & Defense Evasion
 
-**PEAK Step:** Enrich, Confirm 
-**MITRE Tactics:** Persistence, Defense Evasion 
-**Techniques Expected / Validated:** T1564.001 (Hide Artifacts: Hidden Files and Directories), T1070.004 (File Deletion) 
+**PEAK Step:** Enrich, Confirm
+**MITRE Tactics:** Persistence, Defense Evasion
+**Techniques Expected / Validated:** T1564.001 (Hide Artifacts: Hidden Files and Directories), T1070.004 (File Deletion)
 
-**What We Investigated:**
-We reviewed the script for any cleanup or persistence mechanisms after data exfiltration. 
+* **What We Investigated:**
+    Continuing our analysis of the `exfiltratedata.ps1` script (identified in Phase 2), we reviewed its code for any post-exfiltration cleanup routines or mechanisms designed to establish persistence or evade detection.
 
-**KQL Query Used:**
-(No specific KQL query for cleanup was provided in the findings, but the script analysis confirmed the actions.)
+* **KQL Query Used:**
+    (No specific KQL query for cleanup was needed, but the script analysis confirmed the actions.)
 
-**What We Found:**
-After the upload, the script moved both the generated temporary CSV file and the compressed zip file into a non-standard backup directory (`C:\ProgramData\backup\`). It also logs activity to an obscure log file (`C:\ProgramData\entropygorilla.log`). 
+* **What We Found:**
+    After successfully uploading the data, the script performed cleanup actions by moving both the generated temporary CSV file and the compressed zip file into a non-standard backup directory (`C:\ProgramData\backup\`). Additionally, it was found to log activity to an obscure log file (`C:\ProgramData\entropygorilla.log`).
 
-**Interpretation:**
-These actions resemble an attempt by the attacker to manage their local footprint and avoid detection. Moving files to a "backup" directory and logging to an obscure file are common defense evasion techniques to reduce the chances of immediate discovery. 
+* **Interpretation:**
+    These actions represent an attempt by the attacker to manage their local footprint and avoid detection. Moving files to a "backup" directory and logging to an obscure file are common defense evasion techniques employed to reduce the chances of immediate discovery by standard system monitoring or user inspection.
 
-**Mapped MITRE Techniques:**
-* **Defense Evasion** 
-    * T1564.001: Hide Artifacts: Hidden Files and Directories - Moving files to a non-standard "backup" directory could be an attempt to hide them. 
-    * T1070.004: Indicator Removal: File Deletion - Although files are moved rather than deleted outright from the system, it's a form of cleaning up their initial creation points. 
+* **Mapped MITRE Techniques:**
+
+| Tactic          | Technique ID | Description                                                    |
+| :-------------- | :----------- | :------------------------------------------------------------- |
+| Defense Evasion | T1564.001    | Hide Artifacts: Hidden Files and Directories - Moving files to a non-standard "backup" directory within `C:\ProgramData` is an attempt to conceal them from casual observation. |
+| Defense Evasion | T1070.004    | Indicator Removal: File Deletion - Although the files are moved rather than permanently deleted from the system, this action serves to remove them from their initial, more conspicuous creation points, thereby cleaning up the attacker's immediate traces. |
+
+---
 
 ## 6. Timeline of Attacker Activity
 
-| Timestamp (UTC) | Event |
-|---|---|
-| 2025-05-31T16:50:02Z | Initial instance of `.zip` file creation and PowerShell script execution (`exfiltratedata.ps1`) detected.  |
-| 2025-06-02 08:26:13 | `employee-data-20250602122605.zip` file created by `7z.exe`.  |
-| 2025-06-02 08:26:14 | `employee-data-20250602122605.zip` renamed; `exfiltratedata.ps1` executed via PowerShell.  |
-| Ongoing | Repeated creation of `zip` files containing `employee-data-*.csv` by `7z.exe` initiated by PowerShell via `cmd.exe` with elevation.  |
-| Ongoing | Data uploaded to Azure Blob Storage (`https://sacyberrangedanger.blob.core.windows.net/stolencompanydata/employee-data.zip`).  |
-| Ongoing | Generated files moved to `C:\ProgramData\backup\` and logs written to `C:\ProgramData\entropygorilla.log`.  |
+
+| Timestamp (UTC)           | Event                                                                                                                                              |
+| :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-05-31T16:49:46Z      | Initial `cmd.exe` process launched, likely by Azure Guest Agent's Run Command feature, beginning the execution chain.                              |
+| 2025-05-31T16:49:47Z     | `powershell.exe` executed `script3.ps1` via `cmd.exe`.                                                                                             |
+| 2025-05-31T16:49:49Z     | `exfiltratedata.ps1` script downloaded to `C:\programdata\` via `Invoke-WebRequest` by PowerShell (Ingress Tool Transfer).                         |
+| 2025-05-31T16:49:53Z     | First execution of the `exfiltratedata.ps1` script via `cmd.exe` and PowerShell.                                                                   |
+| 2025-05-31T16:49:54Z     | `7-Zip` installer (`7z2408-x64.exe`) executed silently by `exfiltratedata.ps1`.                                                                   |
+| 2025-05-31T16:50:02Z     | `7z.exe` used to compress `employee-data-temp*.csv` into `employee-data-*.zip` by `exfiltratedata.ps1`.                                           |
+| 2025-06-02T12:26:13Z     | Another `employee-data-20250602122605.zip` file created by `7z.exe` (indicating a repeated action).                                                  |
+| 2025-06-02T12:26:14Z     | `employee-data-20250602122605.zip` renamed; `exfiltratedata.ps1` likely re-executed via PowerShell.                                                |
+| Ongoing                 | Repeated creation of `zip` files containing `employee-data-*.csv` by `7z.exe` initiated by PowerShell via `cmd.exe` with elevation.                  |
+| Ongoing                 | Data uploaded to Azure Blob Storage (`https://sacyberrangedanger.blob.core.windows.net/stolencompanydata/employee-data.zip`).                      |
+| Ongoing                 | Generated files moved to `C:\ProgramData\backup\` and logs written to `C:\ProgramData\entropygorilla.log`.                                        |
+
 
 ## 7. MITRE ATT&CK Summary Table
 
@@ -215,7 +227,7 @@ These actions resemble an attempt by the attacker to manage their local footprin
 
 ## 10. Conclusion
 
-The investigation into `danielletargetm` successfully identified a **simulated, yet technically sound, data exfiltration attempt**. The `exfiltratedata.ps1` script demonstrated a **multi-stage attack lifecycle**, including:
+The investigation into `danielletargetm` successfully identified a **data exfiltration attempt**. The `exfiltratedata.ps1` script demonstrated a **multi-stage attack lifecycle**, including:
 
 - Tool transfer and execution  
 - Data staging and compression  
